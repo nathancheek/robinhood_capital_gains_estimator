@@ -166,6 +166,17 @@ def cur_str(num):
 Main script logic
 '''
 def main(args):
+    try:
+        if args.year:
+            year = int(args.year)
+        else:
+            year = date.today().year
+        start_of_year = date(year, 1, 1)
+        end_of_year = date(year, 12, 31)
+    except:
+        logging.error(f'Invalid year {args.year}')
+        quit()
+
     refs = []
     for ref in args.transaction_file:
         new_refs = glob(ref) # Expand wildcards if not done already by the shell
@@ -173,7 +184,7 @@ def main(args):
         if len(new_refs) == 0:
             logging.warning(f'Invalid file or directory: {ref}')
 
-    # Import files / directories
+    # Import files / directories, building lot chains
     for ref in refs:
         if os.path.isfile(ref):
             import_file(ref)
@@ -183,14 +194,13 @@ def main(args):
             logging.warning(f'Invalid file or directory: {ref}')
     
     # Generate CSV of all capital gains for the current year
-    out_filename = 'out_gains.csv'
+    out_filename = f'out_gains_{year}.csv'
     logging.info(f'Writing {out_filename}')
     headers = ['Instrument', 'Long-Term Gains', 'Short-Term Gains']
     with open(out_filename, 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(headers)
         # Start at the HEADs of each instrument lot chain, iterate backwards until hitting a sold lot, then start counting profits per lot until hitting a lot sold prior to the current year
-        start_of_year = date(date.today().year, 1, 1)
         combined_cap_gains_long = Decimal(0)
         combined_cap_gains_short = Decimal(0)
         for instrument in sorted(lot_heads.keys()):
@@ -200,12 +210,13 @@ def main(args):
             while True:
                 if current_lot.sell_date:
                     if current_lot.sell_date >= start_of_year:
-                        lot_gain = (current_lot.sell_price - current_lot.purchase_price) * current_lot.quantity
-                        if (current_lot.sell_date - current_lot.purchase_date) > timedelta(days=365):
-                            cap_gains_long += lot_gain
-                        else:
-                            cap_gains_short += lot_gain
-                    else:
+                        if current_lot.sell_date <= end_of_year:
+                            lot_gain = (current_lot.sell_price - current_lot.purchase_price) * current_lot.quantity
+                            if (current_lot.sell_date - current_lot.purchase_date) > timedelta(days=365): # TODO handle leap years which require > timedelta(days=366)
+                                cap_gains_long += lot_gain
+                            else:
+                                cap_gains_short += lot_gain
+                    else: # We've reached transactions prior to the year in question, stop traversing this instrument
                         break
                 if current_lot.prev_lot:
                     current_lot = current_lot.prev_lot
@@ -215,7 +226,7 @@ def main(args):
                 writer.writerow([instrument, cur_str(cap_gains_long), cur_str(cap_gains_short)])
             combined_cap_gains_long += round(cap_gains_long, 2)
             combined_cap_gains_short += round(cap_gains_short, 2)
-        writer.writerow(['Total', cur_str(combined_cap_gains_long), cur_str(combined_cap_gains_short)])
+        writer.writerow([f'Total ({year})', cur_str(combined_cap_gains_long), cur_str(combined_cap_gains_short)])
 
     # Generate CSV of all lots adjusted for sells and splits
     out_filename = 'out_lots.csv'
@@ -236,6 +247,7 @@ Command line entry point
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('transaction_file', nargs="+", help='Robinhood transaction CSV file or directory of CSV files')
+    parser.add_argument('-y', '--year', help='Year to calculate capital gains')
     parser.add_argument('-v', '--verbose', action='store_true', help='Verbose output')
     args = parser.parse_args()
 
