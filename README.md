@@ -38,6 +38,8 @@ This script calculates an estimate for capital gains given the provided data, bu
 
 ## Improvements
 
-Currently, dividends (CDIV) and stock lending income (SLIP) are ignored. These could be tracked and included in the output.
+Reverse splits (`SPR`) are not yet supported.
 
-Robinhood seems to have a bug where their stock split transactions are logged to 4 decimal places, even though shares are held to 6 decimal places. This can cause stock split calculation errors. This script currently checks for such situations and prompts the user to input the correct split ratio. I have submitted a bug report to Robinhood, so hopefully this will get resolved in due time.
+Currently, dividends (`CDIV`) and stock lending income (`SLIP`) are ignored. These could be tracked and included in the output.
+
+Robinhood seems to have a bug where their stock split (`SPL` and `SPR`) transactions are logged to 4 decimal places, even though shares are held to 6 decimal places. This can cause stock split calculation errors. This script currently checks for such situations and prompts the user to input the correct split ratio. I have submitted a bug report to Robinhood, so hopefully this will get resolved in due time.
